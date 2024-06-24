@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">Barcode Web App</string>
+    <string name="action_settings">Settings</string>
+    <!-- Strings used for fragments for navigation -->
+    <string name="first_fragment_label">First Fragment</string>
+    <string name="second_fragment_label">Second Fragment</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+    <string name="go_home">Home</string>
+    <string name="view_1">View 1</string>
+    <string name="view_2">View 2</string>
+    <string name="logout">Logout</string>
+    <string name="testarea">Test Area</string>
+    <string name="show_menu"><u>Show App Bar</u></string>
+    <string name="hide_menu"><u>Hide App Bar</u></string>
+    <string name="check_for_updates">Check for Updates</string>
+    <string name="disable_scaling">Disable Scaling</string>
+    <string name="enable_scaling">Enable Scaling</string>
+</resources>
