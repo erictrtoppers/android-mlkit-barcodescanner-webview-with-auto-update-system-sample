@@ -15,7 +15,7 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 
 public class Helpers {
-    public static String VersionCode = "2";
+    public static String VersionCode = "3";
 
     public static String GetTextFromUrl(String link){
         ArrayList<String> al=new ArrayList<>();

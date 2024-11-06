@@ -260,6 +260,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onDestroy() {
+        // Clean up webviews:
+        // https://stackoverflow.com/questions/71680097/leaking-mainactivity-through-webview
+        if(mainWebView != null) {
+            mainWebView.removeAllViews();
+            mainWebView.destroy();
+        }
+
+        if(mainWebView2 != null) {
+            mainWebView2.removeAllViews();
+            mainWebView2.destroy();
+        }
+
+        super.onDestroy();
+    }
+
+    @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             WebView visibleView = getVisibleWebView();
@@ -302,6 +319,14 @@ public class MainActivity extends AppCompatActivity {
         webViewInstance.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
         webViewInstance.getSettings().setUseWideViewPort(true);
         webViewInstance.getSettings().setLoadWithOverviewMode(true);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            // chromium, enable hardware acceleration
+            webViewInstance.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        } else {
+            // older android version, disable hardware acceleration
+            webViewInstance.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
 
         webViewInstance.addJavascriptInterface(new WebViewJavaScriptInterface(this, MainActivity.this), "app"); // Call android code from the web using the app name
 
