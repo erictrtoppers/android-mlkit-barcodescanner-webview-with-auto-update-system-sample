@@ -1,16 +1,24 @@
 package com.example.barcodewebapp;
 
 import android.Manifest;
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.media.Image;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
 import android.os.StrictMode;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -22,6 +30,9 @@ import android.webkit.CookieManager;
 import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageView;
@@ -37,6 +48,8 @@ import androidx.navigation.ui.AppBarConfiguration;
 
 import com.example.barcodewebapp.databinding.ActivityMainBinding;
 
+import org.w3c.dom.Text;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -47,6 +60,11 @@ public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
+
+    private static final int PERMISSION_REQUEST_CODE = 101;
+    private CustomWebChromeClient customWebChromeClient;
+    private CustomWebChromeClient customWebChromeClient2;
+    public static final int INPUT_FILE_REQUEST_CODE = 199;
 
     public WebView mainWebView;
     public WebView mainWebView2;
@@ -129,7 +147,7 @@ public class MainActivity extends AppCompatActivity {
             shortMenu.setVisibility(View.GONE);
         }
 
-        checkCameraPermissions(this);
+        requestPermissions(this);
 
         CheckForUpdates(this);
 
@@ -146,6 +164,14 @@ public class MainActivity extends AppCompatActivity {
 
     public WebView getVisibleWebView(){
         if(mainWebView.getVisibility() == View.VISIBLE){
+            return mainWebView;
+        }else{
+            return mainWebView2;
+        }
+    }
+
+    public WebView getInvisibleWebView(){
+        if(mainWebView.getVisibility() != View.VISIBLE){
             return mainWebView;
         }else{
             return mainWebView2;
@@ -182,6 +208,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if(id == R.id.view1){
+            CookieManager.getInstance().flush();
+
             // Refresh view in case they're on the login screen... because they probably logged in the previous view
             String currentUrl = mainWebView.getUrl();
 
@@ -195,6 +223,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if(id == R.id.view2){
+            CookieManager.getInstance().flush();
+
             String currentUrl = mainWebView2.getUrl();
 
             mainWebView.setVisibility(View.INVISIBLE);
@@ -237,6 +267,12 @@ public class MainActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    public void handlePostLogoutManually(){
+        mainWebView.loadUrl(urlBase + "index.html");
+        mainWebView2.loadUrl(urlBase + "index.html");
+        testAreaMenuItem.setVisible(false);
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -247,15 +283,13 @@ public class MainActivity extends AppCompatActivity {
                 getVisibleWebView().evaluateJavascript("processBarcodeValue('" + resultStr + "');", null);
             }
         }
-    }
-
-    public static void checkCameraPermissions(Context context) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
-            // Permission is not granted
-            ActivityCompat.requestPermissions((Activity) context,
-                    new String[]{Manifest.permission.CAMERA},
-                    100);
+        if (requestCode == INPUT_FILE_REQUEST_CODE) {
+            // Call the handler method on the custom client instance
+            if(getVisibleWebView() == mainWebView) {
+                customWebChromeClient.onActivityResult(requestCode, resultCode, data);
+            }else if(getVisibleWebView() == mainWebView2){
+                customWebChromeClient2.onActivityResult(requestCode, resultCode, data);
+            }
         }
     }
 
@@ -320,6 +354,9 @@ public class MainActivity extends AppCompatActivity {
         webViewInstance.getSettings().setUseWideViewPort(true);
         webViewInstance.getSettings().setLoadWithOverviewMode(true);
 
+        // Prevent the "Giant Text" issue from Samsung's Screen Zoom
+        webViewInstance.getSettings().setTextZoom(100);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             // chromium, enable hardware acceleration
             webViewInstance.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -328,7 +365,7 @@ public class MainActivity extends AppCompatActivity {
             webViewInstance.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         }
 
-        webViewInstance.addJavascriptInterface(new WebViewJavaScriptInterface(this, MainActivity.this), "app"); // Call android code from the web using the app name
+        webViewInstance.addJavascriptInterface(new WebViewJavaScriptInterface(this, MainActivity.this, webViewInstance), "app"); // Call android code from the web using the app name
 
         webViewInstance.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -383,10 +420,18 @@ public class MainActivity extends AppCompatActivity {
 
                 // Load the magic
                 view.evaluateJavascript("loadLocalStorage();focusFirstBarcode();", null);
+                android.webkit.CookieManager.getInstance().flush();
                 super.onPageFinished(view, url);
             }
         });
 
+        if(webViewInstance == mainWebView) {
+            customWebChromeClient = new CustomWebChromeClient(this);
+            webViewInstance.setWebChromeClient(customWebChromeClient);
+        }else if(webViewInstance == mainWebView2){
+            customWebChromeClient2 = new CustomWebChromeClient(this);
+            webViewInstance.setWebChromeClient(customWebChromeClient2);
+        }
         webViewInstance.loadUrl(urlBase + "barcode_test.html");
     }
 
@@ -439,4 +484,16 @@ public class MainActivity extends AppCompatActivity {
             Log.w("Error", e.toString());
         }
     }
+
+    // --- Runtime Permissions Handling ---
+    private void requestPermissions(Context context) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CAMERA, Manifest.permission.READ_EXTERNAL_STORAGE},
+                    PERMISSION_REQUEST_CODE);
+        }
+    }
+
 }

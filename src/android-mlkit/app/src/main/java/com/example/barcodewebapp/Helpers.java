@@ -1,6 +1,7 @@
 package com.example.barcodewebapp;
 
 import android.content.Context;
+import android.os.Environment;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -15,7 +16,7 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 
 public class Helpers {
-    public static String VersionCode = "3";
+    public static String VersionCode = "4";
 
     public static String GetTextFromUrl(String link){
         ArrayList<String> al=new ArrayList<>();
